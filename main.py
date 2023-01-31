@@ -192,7 +192,7 @@ def match_template(mapImg, pingImg):
 
 # ini vars
 global debugmode
-debugmode = True
+debugmode = False
 meterPx = 0
 ratio = 1.0
 mapArea = (3180*ratio,1500*ratio, 650*ratio, 650*ratio)
