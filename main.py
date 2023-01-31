@@ -34,6 +34,13 @@ def get_map(area=(0, 0, 1920, 1080)):
     #convert from RGB to BGR plane
     return cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
 
+def get_map_safe(area=(0, 0, 1920, 1080)):
+    # make screenshot
+    img = pyautogui.screenshot("img.png", region = area)
+    #convert to cv2
+    img =  numpy.array(img)
+    #convert from RGB to BGR plane
+    return cv2.imread("img.png")
 
 def first_int_from_string(s):
     number = "0"
@@ -98,13 +105,29 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
         cv2.waitKey(5000)
         cv2.destroyAllWindows()
 
+    if scaleLength > (100*ratio):
+        scaleLength = 100 * ratio
 
     return float(meters/scaleLength)
 
 
-def match_Contour(playerImg, mapImg, color = (255,255,0)):
+def match_Contour(playerImg, mapImg, filterYellow = False, debugColor = (255,255,0)):
 
     #use threshold on map, 160 was the best by experimental Tests
+    if filterYellow:
+        #move to hsv
+        hsv = cv2.cvtColor(mapImg, cv2.COLOR_BGR2HSV)
+      
+        # Threshold of blue in HSV space
+        lower_yellow = numpy.array([20, 100, 100])
+        upper_yellow = numpy.array([40, 255, 255])
+    
+        # override Image
+        mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+        if debugmode:
+            cv2.imwrite(r"mask.png", mask)
+        mapImg =  res = cv2.bitwise_and(mapImg,mapImg, mask= mask)
+
     grayMap = cv2.cvtColor(mapImg, cv2.COLOR_BGR2GRAY)
     thMap = cv2.threshold(grayMap,160,255,cv2.THRESH_BINARY)[1]
     cv2.imwrite(r"images\WT\thMap.png", thMap)
@@ -135,7 +158,7 @@ def match_Contour(playerImg, mapImg, color = (255,255,0)):
     playerY = int(M["m01"] / M["m00"])
 
     if debugmode:
-        cv2.rectangle(mapImg,(playerX-5,playerY-5), (playerX+5,playerY+5), color, 5)
+        cv2.rectangle(mapImg,(playerX-5,playerY-5), (playerX+5,playerY+5), debugColor, 5)
         cv2.imshow('All contours with bounding box', mapImg)
         cv2.waitKey(5000)
         cv2.destroyAllWindows()
@@ -169,11 +192,11 @@ def match_template(mapImg, pingImg):
 
 # ini vars
 global debugmode
-debugmode = False
+debugmode = True
 meterPx = 0
 ratio = 1.0
 mapArea = (3180*ratio,1500*ratio, 650*ratio, 650*ratio)
-scaleArea = (500*ratio,610*ratio, 140*ratio, 40*ratio)
+#scaleArea = (500*ratio,610*ratio, 140*ratio, 40*ratio)
 
 # main loop
 #map = cv2.imread(r"images\WT\wholeMap.jpg")
@@ -184,13 +207,13 @@ ping = cv2.imread(r"images\WT\ping.png")
 
 while True:
     time.sleep(0.1)
-
+    #print(cv2.cvtColor(numpy.uint8([[[0,255,255 ]]]),cv2.COLOR_BGR2HSV)) #print yellow in hsv
 
 
     #x = get_matched_coordinates(image, player)
     if keyboard.is_pressed('Home'):
-        map = get_map(area=(mapArea))
-        scale = map[int(610*ratio):int(650*ratio), int(500*ratio):int(640*ratio)] #im[y1:y2, x1:x2]
+        map = get_map_safe(area=(mapArea))
+        scale = map[int(610*ratio):int(645*ratio), int(500*ratio):int(640*ratio)] #im[y1:y2, x1:x2]
         meterPx = calculate_meter_per_pixel(scale)
         time.sleep(0.1)
 
@@ -198,16 +221,16 @@ while True:
 
         # try:
 
-        map = get_map(area=(mapArea))
+        map = get_map_safe(area=(mapArea))
 
         if meterPx ==0:
-            scale = map[int(610*ratio):int(650*ratio), int(500*ratio):int(640*ratio)] #im[y1:y2, x1:x2]
+            scale = map[int(610*ratio):int(645*ratio), int(500*ratio):int(640*ratio)] #im[y1:y2, x1:x2]
             meterPx = calculate_meter_per_pixel(scale)
         
 
         xPlayer, yPlayer = match_Contour(player, map)
         #xPing, yPing = find_pings(map, ping)
-        xPing, yPing = match_Contour(ping, map, color=(0,255,0))
+        xPing, yPing = match_Contour(ping, map, filterYellow=True, debugColor=(0,255,0))
         
         distancePixel = math.sqrt(math.pow(xPing-xPlayer,2)+math.pow(yPing-yPlayer,2))
 
