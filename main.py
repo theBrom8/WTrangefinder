@@ -54,29 +54,31 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
     
     #prepare image
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    thNumbers = cv2.threshold(gray,40,255,cv2.THRESH_BINARY)[1]
+    th40 = cv2.threshold(gray,40,255,cv2.THRESH_BINARY)[1]
+    th10 = cv2.threshold(gray,10,255,cv2.THRESH_BINARY)[1]
 
-    #read meters
-    sMeters =  pytesseract.image_to_string(thNumbers, config="--psm 7")
-    meters = first_int_from_string(sMeters)
-    if meters == None or (meters < 50):
-        meters = int(pymsgbox.prompt("Brom Ballistic Calculators couldn't read the scale, pleas enter in Meters:", default="250"))
-
-    ## pixellenght of the line
     # lets only look at the bottom 25 pixels
     y, x = gray.shape
-    lineImg = gray#[25:y, 0:x] #im[y1:y2, x1:x2]
+    imageLength = x
 
-    thLine = cv2.threshold(lineImg,10,255,cv2.THRESH_BINARY)[1]
+
+    #read meters
+    sMeters1 =  pytesseract.image_to_string(th40, config="--psm 7")
+    meters1 = first_int_from_string(sMeters1)
+    sMeters2 =  pytesseract.image_to_string(th10, config="--psm 7")
+    meters2 = first_int_from_string(sMeters2)
+
+    if (meters1 or meters2) == None or (meters1 != meters2):
+        meters = int(pymsgbox.prompt("Brom Ballistic Calculators couldn't read the scale, pleas enter in Meters:", default="250"))
 
     #invert image
-    invLine = numpy.invert(thLine)
+    invLine = numpy.invert(th10)
 
     if debugmode:
-        cv2.imwrite("line.png", lineImg)
-        cv2.imwrite("thLine.png", thLine)
+        cv2.imwrite("line.png", gray)
+        cv2.imwrite("thLine.png", th10)
         cv2.imwrite("invLine.png", invLine)
-        cv2.imwrite("thNumbers.png", thNumbers)
+        cv2.imwrite("thNumbers.png", th40)
 
     # get contours CHAIN_APPROX_NONE  or  CHAIN_APPROX_SIMPLE
     contours, hierarchy = cv2.findContours(image=invLine, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
@@ -89,6 +91,7 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
 
     scaleLength = 1
 
+    #length of line im pixel
     # Draw a bounding box around all contours
     for c in contours:
             # Make sure contour area is large enough
@@ -97,7 +100,7 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
         if area > 10:
             x, y, w, h = cv2.boundingRect(c)
             cv2.rectangle(with_contours,(x,y), (x+w,y+h), (255,0,0), 5)
-            if w > scaleLength:
+            if imageLength > w > scaleLength:
                 scaleLength = w
 
     if debugmode:        
@@ -105,10 +108,10 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
         cv2.waitKey(5000)
         cv2.destroyAllWindows()
 
-    if scaleLength > (100*ratio):
-        scaleLength = 100 * ratio
+    # if scaleLength > (100*ratio):
+    #     scaleLength = 100 * ratio
 
-    return float(meters/scaleLength)
+    return float(meters1/scaleLength)
 
 
 def match_Contour(playerImg, mapImg, filterYellow = False, debugColor = (255,255,0)):
