@@ -50,7 +50,7 @@ def first_int_from_string(s):
         else:
             return int(number)
 
-def calculate_meter_per_pixel(img): # will need an image of the scale part of the map
+def calculate_meter_per_pixel(img, manual = False): # will need an image of the scale part of the map
     
     #prepare image
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -68,8 +68,8 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
     sMeters2 =  pytesseract.image_to_string(th10, config="--psm 7")
     meters2 = first_int_from_string(sMeters2)
 
-    if (meters1 or meters2) == None or (meters1 != meters2):
-        meters = int(pymsgbox.prompt("Brom Ballistic Calculators couldn't read the scale, pleas enter in Meters:", default="250"))
+    if (meters1 or meters2) == None or (meters1 != meters2) or manual:
+        meters1 = int(pymsgbox.prompt("Brom Ballistic Calculators couldn't read the scale, pleas enter in Meters:", default="250"))
 
     #invert image
     invLine = numpy.invert(th10)
@@ -111,7 +111,7 @@ def calculate_meter_per_pixel(img): # will need an image of the scale part of th
     # if scaleLength > (100*ratio):
     #     scaleLength = 100 * ratio
 
-    return float(meters1/scaleLength)
+    return float(meters1/scaleLength), meters1  
 
 
 def match_Contour(playerImg, mapImg, filterYellow = False, debugColor = (255,255,0)):
@@ -155,11 +155,14 @@ def match_Contour(playerImg, mapImg, filterYellow = False, debugColor = (255,255
             bestMatchIndex = i
     
     #calculate center of best match
-    M = cv2.moments(mapContours[bestMatchIndex])
-    # Movements contain diffrent properties, the centroid is found like this:
-    playerX = int(M["m10"] / M["m00"])
-    playerY = int(M["m01"] / M["m00"])
-
+    try:
+        M = cv2.moments(mapContours[bestMatchIndex])
+        # Movements contain diffrent properties, the centroid is found like this:
+        playerX = int(M["m10"] / M["m00"])
+        playerY = int(M["m01"] / M["m00"])
+    except:
+        return 0, 0
+        
     if debugmode:
         cv2.rectangle(mapImg,(playerX-5,playerY-5), (playerX+5,playerY+5), debugColor, 5)
         cv2.imshow('All contours with bounding box', mapImg)
@@ -199,6 +202,7 @@ debugmode = False
 meterPx = 0
 ratio = 1.0
 mapArea = (3180*ratio,1500*ratio, 650*ratio, 650*ratio)
+grid = 0
 #scaleArea = (500*ratio,610*ratio, 140*ratio, 40*ratio)
 
 # main loop
@@ -217,7 +221,12 @@ while True:
     if keyboard.is_pressed('Home'):
         map = get_map_safe(area=(mapArea))
         scale = map[int(610*ratio):int(645*ratio), int(500*ratio):int(640*ratio)] #im[y1:y2, x1:x2]
-        meterPx = calculate_meter_per_pixel(scale)
+        if keyboard.is_pressed('shift'):
+            meterPx, grid = calculate_meter_per_pixel(scale, True)
+        else:
+            meterPx, grid = calculate_meter_per_pixel(scale)
+            pymsgbox.alert(title="Grid", text=str(grid), timeout=800)
+
         time.sleep(0.1)
 
     if keyboard.is_pressed('§'):
@@ -228,7 +237,8 @@ while True:
 
         if meterPx ==0:
             scale = map[int(610*ratio):int(645*ratio), int(500*ratio):int(640*ratio)] #im[y1:y2, x1:x2]
-            meterPx = calculate_meter_per_pixel(scale)
+            meterPx, grid = calculate_meter_per_pixel(scale)
+            pymsgbox.alert(title="Grid", text=str(grid), timeout=800)
         
 
         xPlayer, yPlayer = match_Contour(player, map)
